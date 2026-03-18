@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peak Energy Rewards — Interactive Prototype</title>
+<style>
+  :root {
+    --green: #4ecba0; --green-dim: rgba(78,203,160,0.1); --blue: #4a9eff;
+    --amber: #f5a048; --red: #e05555; --purple: #8b5cf6;
+    --bg: #f0f0f0; --card: #fff; --border: #e8e8e8; --text: #333; --muted: #999;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a2e; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 24px; color: var(--text); }
+
+  /* Flow selector */
+  .flow-selector { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; justify-content: center; }
+  .flow-btn { padding: 10px 18px; border: 2px solid rgba(255,255,255,0.15); border-radius: 10px; background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.6); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .flow-btn.active { border-color: var(--green); background: rgba(78,203,160,0.15); color: var(--green); }
+  .flow-btn:hover { border-color: rgba(255,255,255,0.3); }
+  .flow-title { color: #fff; font-size: 20px; font-weight: 700; margin-bottom: 6px; text-align: center; }
+  .flow-subtitle { color: rgba(255,255,255,0.5); font-size: 13px; margin-bottom: 20px; text-align: center; }
+
+  /* Phone frame (customer flows) */
+  .phone { width: 375px; height: 740px; background: var(--bg); border-radius: 40px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5), inset 0 0 0 3px #333; position: relative; display: none; flex-direction: column; }
+  .phone.active { display: flex; }
+  .phone-status { height: 44px; background: var(--green); display: flex; justify-content: space-between; align-items: center; padding: 0 24px; font-size: 12px; color: #fff; font-weight: 600; }
+  .phone-nav { height: 56px; background: var(--green); display: flex; align-items: center; padding: 0 16px; gap: 12px; }
+  .phone-nav-title { color: #fff; font-size: 17px; font-weight: 600; flex: 1; }
+  .phone-nav-icon { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; color: #fff; }
+  .phone-body { flex: 1; overflow-y: auto; }
+  .phone-bottom { height: 34px; background: var(--bg); display: flex; justify-content: center; align-items: center; }
+  .phone-bar { width: 134px; height: 5px; background: #333; border-radius: 3px; }
+
+  /* Desktop frame (operator, agent, settlement) */
+  .desktop { width: 1060px; max-width: 100%; background: var(--bg); border-radius: 12px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); display: none; flex-direction: column; }
+  .desktop.active { display: flex; }
+  .desktop-chrome { height: 36px; background: #2d2d3d; display: flex; align-items: center; padding: 0 12px; gap: 8px; }
+  .desktop-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .desktop-dot.r { background: #ff5f57; }
+  .desktop-dot.y { background: #ffbd2e; }
+  .desktop-dot.g { background: #28c840; }
+  .desktop-url { flex: 1; margin-left: 12px; background: rgba(255,255,255,0.08); border-radius: 6px; padding: 4px 12px; font-size: 11px; color: rgba(255,255,255,0.5); }
+  .desktop-layout { display: flex; min-height: 580px; }
+  .desktop-sidebar { width: 220px; background: #1e293b; padding: 16px 0; flex-shrink: 0; }
+  .desktop-sidebar-title { color: #fff; font-size: 14px; font-weight: 700; padding: 0 16px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 8px; }
+  .desktop-sidebar-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; font-size: 12px; color: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.15s; }
+  .desktop-sidebar-item:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.8); }
+  .desktop-sidebar-item.active { background: rgba(78,203,160,0.15); color: var(--green); border-left: 3px solid var(--green); }
+  .desktop-sidebar-icon { font-size: 16px; width: 20px; text-align: center; }
+  .desktop-sidebar-section { font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.25); text-transform: uppercase; letter-spacing: 1px; padding: 16px 16px 6px; }
+  .desktop-main { flex: 1; overflow-y: auto; padding: 24px; }
+  .desktop-main .s-card { margin: 0 0 16px; }
+  .desktop-main .s-stats { margin: 0 0 16px; }
+  .desktop-main .s-btn { margin: 0 0 12px; width: auto; display: inline-block; padding: 10px 24px; font-size: 13px; }
+  .desktop-main .s-btn-row { margin: 0 0 16px; display: flex; }
+  .desktop-main .s-btn-row .s-btn { margin: 0; }
+  .desktop-main .s-hero { border-radius: 12px; margin-bottom: 16px; }
+  .desktop-main .s-event { margin: 0 0 16px; }
+  .desktop-main .s-system-flow { margin: 0 0 12px; }
+
+  /* Desktop step bar */
+  .d-step-bar { display: flex; gap: 4px; margin-bottom: 20px; background: var(--card); border-radius: 10px; padding: 4px; border: 1px solid var(--border); }
+  .d-step { flex: 1; padding: 10px 8px; text-align: center; border-radius: 8px; font-size: 11px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all 0.2s; }
+  .d-step.active { background: var(--green); color: #fff; }
+  .d-step.done { background: var(--green-dim); color: var(--green); }
+  .d-step-num { display: inline-block; width: 18px; height: 18px; border-radius: 50%; font-size: 10px; line-height: 18px; margin-right: 4px; background: rgba(0,0,0,0.08); }
+  .d-step.active .d-step-num { background: rgba(255,255,255,0.25); }
+  .d-step.done .d-step-num { background: rgba(78,203,160,0.2); }
+
+  /* Desktop grid layout for content */
+  .d-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .d-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .d-grid-wide { grid-column: 1 / -1; }
+  .d-page-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .d-page-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+
+  /* Screens */
+  .screen { display: none; height: 100%; overflow-y: auto; }
+  .screen.active { display: block; }
+
+  /* Step indicator */
+  .step-indicator { display: flex; justify-content: center; gap: 6px; padding: 16px 20px 8px; }
+  .step-dot { width: 8px; height: 8px; border-radius: 50%; background: #ddd; transition: all 0.3s; }
+  .step-dot.active { background: var(--green); width: 24px; border-radius: 4px; }
+  .step-dot.done { background: var(--green); }
+  .step-label { text-align: center; font-size: 11px; color: var(--muted); padding: 0 20px 12px; }
+
+  /* Content blocks */
+  .s-pad { padding: 16px 20px; }
+  .s-hero { background: linear-gradient(135deg, var(--green), #3ab88d); padding: 32px 20px; text-align: center; color: #fff; }
+  .s-hero-icon { font-size: 48px; margin-bottom: 12px; }
+  .s-hero-title { font-size: 22px; font-weight: 700; }
+  .s-hero-sub { font-size: 14px; opacity: 0.8; margin-top: 6px; }
+
+  .s-card { background: var(--card); border-radius: 14px; margin: 12px 20px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .s-card-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+  .s-card-sm { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  .s-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f2f2f2; font-size: 13px; }
+  .s-row:last-child { border-bottom: none; }
+  .s-row-label { color: var(--muted); }
+  .s-row-val { font-weight: 600; }
+  .s-row-val.green { color: var(--green); }
+  .s-row-val.red { color: var(--red); }
+
+  .s-stats { display: flex; gap: 1px; margin: 0 20px; background: var(--border); border-radius: 14px; overflow: hidden; }
+  .s-stat { flex: 1; background: var(--card); padding: 14px 8px; text-align: center; }
+  .s-stat-val { font-size: 18px; font-weight: 700; }
+  .s-stat-label { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+
+  /* Buttons */
+  .s-btn { display: block; margin: 16px 20px; padding: 14px; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; width: calc(100% - 40px); transition: all 0.2s; }
+  .s-btn-green { background: var(--green); color: #fff; }
+  .s-btn-green:hover { filter: brightness(1.05); }
+  .s-btn-blue { background: var(--blue); color: #fff; }
+  .s-btn-red { background: var(--red); color: #fff; }
+  .s-btn-outline { background: none; border: 2px solid var(--border); color: var(--muted); }
+  .s-btn-opted { background: var(--green-dim); color: var(--green); }
+  .s-btn-row { display: flex; gap: 8px; margin: 16px 20px; }
+  .s-btn-row .s-btn { margin: 0; flex: 1; }
+
+  /* Tags */
+  .s-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 4px; }
+  .s-tag-green { background: var(--green-dim); color: var(--green); }
+  .s-tag-blue { background: rgba(74,158,255,0.1); color: var(--blue); }
+  .s-tag-amber { background: rgba(245,160,72,0.1); color: var(--amber); }
+  .s-tag-red { background: rgba(224,85,85,0.1); color: var(--red); }
+  .s-tag-purple { background: rgba(139,92,246,0.1); color: var(--purple); }
+
+  /* Event card */
+  .s-event { background: var(--card); border-radius: 14px; margin: 12px 20px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .s-event-top { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #fafafa; border-bottom: 1px solid var(--border); }
+  .s-event-body { padding: 14px 16px; }
+
+  /* Reward tiers visual */
+  .s-tiers { display: flex; gap: 8px; margin: 12px 0; }
+  .s-tier { flex: 1; text-align: center; padding: 10px 6px; border-radius: 10px; border: 1.5px solid var(--border); cursor: default; pointer-events: none; background: #fafafa; }
+  .s-tier.t1 { border-color: var(--green); background: var(--green-dim); }
+  .s-tier-pct { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .s-tier.t1 .s-tier-pct { color: var(--green); }
+  .s-tier-val { font-size: 18px; font-weight: 700; margin-top: 2px; }
+  .s-tier.t1 .s-tier-val { color: var(--green); }
+  .s-tier-label { font-size: 8px; color: var(--muted); margin-top: 2px; text-transform: uppercase; }
+
+  /* Progress bar */
+  .s-progress { margin: 12px 0; }
+  .s-progress-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .s-progress-bar { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+  .s-progress-fill { height: 100%; border-radius: 4px; transition: width 1s ease; }
+  .s-progress-fill.green { background: var(--green); }
+  .s-progress-fill.blue { background: var(--blue); }
+
+  /* Performance comparison */
+  .s-compare { display: flex; gap: 12px; margin: 12px 0; }
+  .s-compare-item { flex: 1; text-align: center; padding: 16px 8px; border-radius: 12px; }
+  .s-compare-item.baseline { background: #f5f5f5; }
+  .s-compare-item.actual { background: var(--green-dim); }
+  .s-compare-val { font-size: 28px; font-weight: 700; }
+  .s-compare-item.actual .s-compare-val { color: var(--green); }
+  .s-compare-unit { font-size: 11px; color: var(--muted); }
+  .s-compare-label { font-size: 10px; color: var(--muted); margin-top: 4px; font-weight: 600; text-transform: uppercase; }
+
+  /* Timeline */
+  .s-timeline { padding: 0 4px; }
+  .s-tl-item { display: flex; gap: 12px; padding-bottom: 16px; }
+  .s-tl-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; border: 2px solid; background: #fff; }
+  .s-tl-line { flex-shrink: 0; width: 10px; display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .s-tl-line::after { content: ''; flex: 1; width: 2px; background: var(--border); margin-top: 2px; }
+  .s-tl-content { flex: 1; }
+  .s-tl-time { font-size: 10px; color: var(--muted); }
+  .s-tl-title { font-size: 12px; font-weight: 600; margin-top: 1px; }
+  .s-tl-detail { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Chips */
+  .s-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .s-chip { padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; border: 1px solid var(--border); cursor: pointer; }
+  .s-chip.active { background: var(--green-dim); border-color: var(--green); color: var(--green); font-weight: 600; }
+
+  /* Form inputs */
+  .s-input-group { margin-bottom: 14px; }
+  .s-input-label { font-size: 10px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+  .s-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; background: #fafafa; }
+
+  /* Animated pulse */
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .pulse { animation: pulse 1.5s infinite; }
+
+  /* System badge */
+  .s-system-flow { display: flex; align-items: center; gap: 6px; margin: 8px 0; padding: 8px 12px; background: #f8f8f8; border-radius: 8px; font-size: 10px; color: var(--muted); }
+  .s-sys-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+  .s-sys-kaluza { background: rgba(74,158,255,0.1); color: var(--blue); }
+  .s-sys-keg { background: rgba(78,203,160,0.1); color: var(--green); }
+  .s-sys-sfmc { background: rgba(139,92,246,0.1); color: var(--purple); }
+  .s-sys-sf { background: rgba(139,92,246,0.08); color: #8b5cf6; }
+  .s-sys-arrow { color: #ccc; }
+
+  /* Search */
+  .s-search { display: flex; gap: 8px; margin: 12px 20px; }
+  .desktop-main .s-search { margin: 0 0 16px; }
+  .s-search input { flex: 1; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: var(--card); }
+  .s-search button { padding: 12px 16px; background: var(--green); color: #fff; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; }
+
+  /* Agent actions */
+  .s-actions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .s-action-btn { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 12px; background: var(--card); border: 1.5px solid var(--border); border-radius: 14px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--text); transition: all 0.2s; }
+  .s-action-btn:hover { border-color: var(--green); background: var(--green-dim); }
+  .s-action-icon { width: 44px; height: 44px; border-radius: 12px; background: #f5f5f5; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+</style>
+</head>
+<body>
+
+<div class="flow-title">Peak Energy Rewards — Prototype</div>
+<div class="flow-subtitle">Select a flow to walk through the interactive journey</div>
+
+<div class="flow-selector">
+  <button class="flow-btn active" onclick="startFlow('register')">Customer Registration</button>
+  <button class="flow-btn" onclick="startFlow('event')">Event Participation</button>
+  <button class="flow-btn" onclick="startFlow('operator')">Operator: Plan Event</button>
+  <button class="flow-btn" onclick="startFlow('agent')">Agent: Customer Lookup</button>
+  <button class="flow-btn" onclick="startFlow('propman')">Proposition Manager</button>
+  <button class="flow-btn" onclick="startFlow('settlement')">Settlement & Reward</button>
+</div>
+
+<div class="phone" id="frame-phone">
+  <div class="phone-status"><span>9:41</span><span></span></div>
+  <div class="phone-nav">
+    <div class="phone-nav-title" id="nav-title">Peak Energy Rewards</div>
+    <div class="phone-nav-icon" id="nav-icon">?</div>
+  </div>
+  <div class="phone-body" id="phone-body"></div>
+  <div class="phone-bottom"><div class="phone-bar"></div></div>
+</div>
+
+<div class="desktop" id="frame-desktop">
+  <div class="desktop-chrome">
+    <div class="desktop-dot r"></div><div class="desktop-dot y"></div><div class="desktop-dot g"></div>
+    <div class="desktop-url" id="desktop-url">kaluza-flex.app / event-planner</div>
+  </div>
+  <div class="desktop-layout">
+    <div class="desktop-sidebar">
+      <div class="desktop-sidebar-title" id="desktop-sidebar-title">Kaluza Flex</div>
+      <div id="desktop-sidebar-items"></div>
+    </div>
+    <div class="desktop-main" id="desktop-body"></div>
+  </div>
+</div>
+
+<script>
+const mobileFlows = ['register','event'];
+const desktopFlows = ['operator','agent','propman','settlement'];
+
+const desktopConfig = {
+  operator: {
+    title: 'Kaluza Flex',
+    url: 'kaluza-flex.app / bdr / event-planner',
+    sidebar: [
+      { section: 'BDR Operations' },
+      { icon: '📋', label: 'Plan Event', active: true },
+      { icon: '⚡', label: 'Active Events' },
+      { icon: '✓', label: 'Completed Events' },
+      { section: 'Configuration' },
+      { icon: '🎯', label: 'Targeting Rules' },
+      { icon: '💰', label: 'Reward Profiles' },
+      { section: 'Analytics' },
+      { icon: '📊', label: 'Event Reports' },
+      { icon: '📈', label: 'Participation Trends' },
+    ]
+  },
+  agent: {
+    title: 'AGL Agent Console',
+    url: 'agl-salesforce.app / service / per-management',
+    sidebar: [
+      { section: 'Customer Service' },
+      { icon: '🔍', label: 'Customer Search', active: true },
+      { icon: '📋', label: 'Recent Lookups' },
+      { section: 'BDR Management' },
+      { icon: '👥', label: 'Registrations' },
+      { icon: '⚡', label: 'Active Events' },
+      { section: 'Tools' },
+      { icon: '📊', label: 'Reports' },
+      { icon: '⚙️', label: 'Settings' },
+    ]
+  },
+  propman: {
+    title: 'Kaluza Flex',
+    url: 'kaluza-flex.app / bdr / proposition-config',
+    sidebar: [
+      { section: 'Proposition' },
+      { icon: '🎯', label: 'Reward Profiles', active: true },
+      { icon: '👥', label: 'Eligibility Rules' },
+      { icon: '📋', label: 'Event Templates' },
+      { section: 'Baselining' },
+      { icon: '📊', label: 'Baseline Config' },
+      { icon: '☀️', label: 'Solar Adjustment' },
+      { section: 'Testing' },
+      { icon: '🧪', label: 'Test Environment' },
+      { icon: '📈', label: 'Program Metrics' },
+    ]
+  },
+  settlement: {
+    title: 'Kaluza Flex',
+    url: 'kaluza-flex.app / bdr / settlement',
+    sidebar: [
+      { section: 'Settlement' },
+      { icon: '📥', label: 'Data Ingestion', active: true },
+      { icon: '📊', label: 'Baseline Calc' },
+      { icon: '💰', label: 'Reward Engine' },
+      { icon: '✓', label: 'Settlement Log' },
+      { section: 'Audit' },
+      { icon: '🔍', label: 'Leakage Analysis' },
+      { icon: '📋', label: 'Calculation Audit' },
+      { section: 'Config' },
+      { icon: '⚙️', label: 'Baseline Config' },
+      { icon: '⚙️', label: 'Reward Config' },
+    ]
+  },
+};
+
+const flows = {
+
+  // ═══════════════════════════════════════
+  // CUSTOMER REGISTRATION
+  // ═══════════════════════════════════════
+  register: {
+    title: 'Peak Energy Rewards',
+    icon: '👤',
+    steps: [
+      { label: 'Welcome',
+        html: `
+        <div class="s-hero">
+          <div class="s-hero-icon">⚡</div>
+          <div class="s-hero-title">Peak Energy Rewards</div>
+          <div class="s-hero-sub">Get rewarded for reducing energy during peak times</div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">How it works</div>
+          <div class="s-row"><span class="s-row-label">1.</span><span>We notify you before peak events</span></div>
+          <div class="s-row"><span class="s-row-label">2.</span><span>Opt in and reduce your usage</span></div>
+          <div class="s-row"><span class="s-row-label">3.</span><span>Earn bill credits as rewards</span></div>
+        </div>
+        <button class="s-btn s-btn-green" onclick="nextStep()">Get Started</button>
+        <div class="s-system-flow"><span class="s-sys-badge s-sys-sf">SF CRM</span> <span class="s-sys-arrow">→</span> Eligibility check</div>
+      `},
+      { label: 'Select Property',
+        html: `
+        <div class="step-indicator"><div class="step-dot active"></div><div class="step-dot"></div><div class="step-dot"></div><div class="step-dot"></div></div>
+        <div class="step-label">Step 1 of 4 — Select your property</div>
+        <div class="s-card">
+          <div class="s-card-title">Which property would you like to enrol?</div>
+          <div class="s-row" style="padding:14px 0; cursor:pointer; border-left:3px solid var(--green); padding-left:12px;">
+            <div><div style="font-weight:600;">42 Solar Crescent</div><div style="font-size:11px; color:var(--muted);">Richmond VIC 3121 | NMI: 6305 1234 5678</div></div>
+            <span style="color:var(--green); font-size:18px;">&#10003;</span>
+          </div>
+          <div class="s-row" style="padding:14px 0; cursor:pointer; padding-left:15px; opacity:0.5;">
+            <div><div style="font-weight:600;">15 Green St</div><div style="font-size:11px; color:var(--muted);">Fitzroy VIC 3065 | NMI: 6305 9876 5432</div></div>
+          </div>
+        </div>
+        <button class="s-btn s-btn-green" onclick="nextStep()">Continue</button>
+      `},
+      { label: 'Notifications',
+        html: `
+        <div class="step-indicator"><div class="step-dot done"></div><div class="step-dot active"></div><div class="step-dot"></div><div class="step-dot"></div></div>
+        <div class="step-label">Step 2 of 4 — Notification preferences</div>
+        <div class="s-card">
+          <div class="s-card-title">How should we notify you?</div>
+          <div class="s-row"><span>Push Notifications</span>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;">
+              <input type="checkbox" checked style="opacity:0;width:0;height:0;">
+              <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:var(--green);border-radius:24px;transition:.3s;"><span style="position:absolute;height:18px;width:18px;left:23px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;"></span></span>
+            </label>
+          </div>
+          <div class="s-row"><span>SMS</span>
+            <label style="position:relative;display:inline-block;width:44px;height:24px;">
+              <input type="checkbox" style="opacity:0;width:0;height:0;">
+              <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;border-radius:24px;transition:.3s;"><span style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;"></span></span>
+            </label>
+          </div>
+        </div>
+        <button class="s-btn s-btn-green" onclick="nextStep()">Continue</button>
+      `},
+      { label: 'Review',
+        html: `
+        <div class="step-indicator"><div class="step-dot done"></div><div class="step-dot done"></div><div class="step-dot active"></div><div class="step-dot"></div></div>
+        <div class="step-label">Step 3 of 4 — Review & confirm</div>
+        <div class="s-card">
+          <div class="s-card-title">Registration Summary</div>
+          <div class="s-row"><span class="s-row-label">Property</span><span class="s-row-val">42 Solar Crescent, Richmond</span></div>
+          <div class="s-row"><span class="s-row-label">NMI</span><span class="s-row-val">6305 1234 5678</span></div>
+          <div class="s-row"><span class="s-row-label">Notifications</span><span class="s-row-val">Push</span></div>
+          <div class="s-row"><span class="s-row-label">Opt-in Model</span><span class="s-row-val">Per event</span></div>
+        </div>
+        <div class="s-system-flow">
+          <span class="s-sys-badge s-sys-kaluza">Kaluza</span> <span class="s-sys-arrow">→</span>
+          <span class="s-sys-badge s-sys-keg">KEG</span> <span class="s-sys-arrow">→</span>
+          <span class="s-sys-badge s-sys-sf">SF CRM</span> +
+          <span class="s-sys-badge s-sys-sfmc">SFMC</span>
+        </div>
+        <button class="s-btn s-btn-green" onclick="nextStep()">Confirm Registration</button>
+      `},
+      { label: 'Confirmed',
+        html: `
+        <div class="step-indicator"><div class="step-dot done"></div><div class="step-dot done"></div><div class="step-dot done"></div><div class="step-dot active"></div></div>
+        <div class="s-hero" style="background:linear-gradient(135deg,var(--green),#2ea87a);">
+          <div class="s-hero-icon">&#10003;</div>
+          <div class="s-hero-title">You're Registered!</div>
+          <div class="s-hero-sub">We'll notify you when the next event is available</div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">What happens next?</div>
+          <div class="s-row"><span class="s-row-label">1.</span><span>You'll receive a push notification before each event</span></div>
+          <div class="s-row"><span class="s-row-label">2.</span><span>Review the event details and opt in</span></div>
+          <div class="s-row"><span class="s-row-label">3.</span><span>Reduce your usage during the event window</span></div>
+          <div class="s-row"><span class="s-row-label">4.</span><span>Earn rewards credited to your bill</span></div>
+        </div>
+        <button class="s-btn s-btn-outline" onclick="startFlow('event')">Try: Event Participation →</button>
+      `},
+    ]
+  },
+
+  // ═══════════════════════════════════════
+  // EVENT PARTICIPATION
+  // ═══════════════════════════════════════
+  event: {
+    title: 'Events',
+    icon: '⚡',
+    steps: [
+      { label: 'Invitation',
+        html: `
+        <div style="padding:16px 20px 8px;"><span class="s-tag s-tag-green">NEW EVENT</span></div>
+        <div class="s-event">
+          <div class="s-event-top">
+            <span class="s-tag s-tag-green">TURN DOWN</span>
+            <span style="font-size:12px;color:var(--muted);">Today</span>
+          </div>
+          <div class="s-event-body">
+            <div style="font-size:20px;font-weight:700;margin-bottom:4px;">16:00 — 18:00</div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:14px;">Reduce your electricity usage and earn rewards</div>
+            <div class="s-row"><span class="s-row-label">Your Baseline</span><span class="s-row-val">3.0 kWh</span></div>
+            <div class="s-row"><span class="s-row-label">Your Target</span><span class="s-row-val green">Reduce to 2.0 kWh</span></div>
+            <div class="s-row"><span class="s-row-label">Opt-in Cutoff</span><span class="s-row-val">15:30</span></div>
+            <div class="s-card-title" style="margin-top:14px;">Reward Tiers</div>
+            <div class="s-tiers">
+              <div class="s-tier t1"><div class="s-tier-pct">100%+ target</div><div style="font-size:10px;color:var(--muted);margin-top:1px;">Reduce by &ge; 1.0 kWh</div><div class="s-tier-val">$10</div><div class="s-tier-label">Tier 1</div></div>
+              <div class="s-tier"><div class="s-tier-pct">50%+ target</div><div style="font-size:10px;color:var(--muted);margin-top:1px;">Reduce by &ge; 0.5 kWh</div><div class="s-tier-val">$5</div><div class="s-tier-label">Tier 2</div></div>
+              <div class="s-tier"><div class="s-tier-pct">25%+ target</div><div style="font-size:10px;color:var(--muted);margin-top:1px;">Reduce by &ge; 0.25 kWh</div><div class="s-tier-val">$2</div><div class="s-tier-label">Tier 3</div></div>
+            </div>
+          </div>
+        </div>
+        <button class="s-btn s-btn-green" onclick="nextStep()">Opt In to This Event</button>
+        <div class="s-system-flow"><span class="s-sys-badge s-sys-sfmc">SFMC</span> delivered invitation via push notification</div>
+      `},
+      { label: 'Opted In',
+        html: `
+        <div class="s-hero" style="background:linear-gradient(135deg,var(--green),#2ea87a);padding:24px 20px;">
+          <div style="font-size:36px;">&#10003;</div>
+          <div class="s-hero-title" style="font-size:18px;">You're Opted In!</div>
+          <div class="s-hero-sub">Event starts at 16:00 today</div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">Tips to maximise your reward</div>
+          <div class="s-row"><span>Turn off non-essential appliances</span></div>
+          <div class="s-row"><span>Delay laundry and dishwasher</span></div>
+          <div class="s-row"><span>Pre-cool your home before 16:00</span></div>
+        </div>
+        <div class="s-card">
+          <div class="s-progress">
+            <div class="s-progress-label"><span>Time until event</span><span style="font-weight:600;">2h 15m</span></div>
+            <div class="s-progress-bar"><div class="s-progress-fill green" style="width:25%;"></div></div>
+          </div>
+        </div>
+        <div class="s-system-flow"><span class="s-sys-badge s-sys-kaluza">Kaluza</span> recorded opt-in. Prediction updated.</div>
+        <button class="s-btn s-btn-outline" onclick="nextStep()">Simulate: Event Ends →</button>
+      `},
+      { label: 'Results',
+        html: `
+        <div style="padding:16px 20px 8px;"><span class="s-tag s-tag-green">EVENT SETTLED</span></div>
+        <div class="s-card">
+          <div class="s-card-title">Your Performance</div>
+          <div class="s-compare">
+            <div class="s-compare-item baseline">
+              <div class="s-compare-val">3.0</div>
+              <div class="s-compare-unit">kWh</div>
+              <div class="s-compare-label">Baseline</div>
+            </div>
+            <div class="s-compare-item actual">
+              <div class="s-compare-val">1.8</div>
+              <div class="s-compare-unit">kWh</div>
+              <div class="s-compare-label">Your Usage</div>
+            </div>
+          </div>
+          <div class="s-progress" style="margin-top:8px;">
+            <div class="s-progress-label"><span>Reduction achieved</span><span style="font-weight:700;color:var(--green);">1.2 kWh (120% of target)</span></div>
+            <div class="s-progress-bar"><div class="s-progress-fill green" style="width:100%;"></div></div>
+          </div>
+        </div>
+        <div class="s-card" style="text-align:center;">
+          <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;">Reward Earned</div>
+          <div style="font-size:36px;font-weight:700;color:var(--green);margin:8px 0;">$10.00</div>
+          <span class="s-tag s-tag-green">TIER 1 ACHIEVED</span>
+          <div class="s-card-sm">Target: reduce to 2.0 kWh | You used: 1.8 kWh</div>
+        </div>
+        <div class="s-system-flow">
+          <span class="s-sys-badge s-sys-kaluza">Kaluza</span> <span class="s-sys-arrow">→</span>
+          <span class="s-sys-badge s-sys-keg">KEG</span> <span class="s-sys-arrow">→</span> Billing credit + notification
+        </div>
+        <button class="s-btn s-btn-outline" onclick="nextStep()">View Lifetime Stats →</button>
+      `},
+      { label: 'Dashboard',
+        html: `
+        <div class="s-hero" style="padding:24px 20px;">
+          <div style="font-size:11px;opacity:0.8;text-transform:uppercase;letter-spacing:0.5px;">Lifetime Rewards</div>
+          <div style="font-size:40px;font-weight:700;">$127.50</div>
+          <div style="font-size:13px;opacity:0.7;margin-top:4px;">12 events | 847 kWh shifted</div>
+        </div>
+        <div class="s-stats">
+          <div class="s-stat"><div class="s-stat-val" style="color:var(--green);">92%</div><div class="s-stat-label">Participation</div></div>
+          <div class="s-stat"><div class="s-stat-val">5</div><div class="s-stat-label">Streak</div></div>
+          <div class="s-stat"><div class="s-stat-val">$10.63</div><div class="s-stat-label">Avg Reward</div></div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">Recent Events</div>
+          <div class="s-row"><span>15 Jan — Turn Down</span><span class="s-row-val green">$10.00</span></div>
+          <div class="s-row"><span>12 Jan — Turn Down</span><span class="s-row-val green">$5.00</span></div>
+          <div class="s-row"><span>8 Jan — Turn Down</span><span class="s-row-val green">$10.00</span></div>
+          <div class="s-row" style="opacity:0.4;"><span>3 Jan — Did not participate</span><span class="s-row-val">—</span></div>
+        </div>
+      `},
+    ]
+  },
+
+  // ═══════════════════════════════════════
+  // OPERATOR: PLAN EVENT (Desktop)
+  // ═══════════════════════════════════════
+  operator: {
+    title: 'Event Planner',
+    icon: '📊',
+    steps: [
+      { label: 'Configure',
+        html: `
+        <div class="d-page-title">Plan New Event</div>
+        <div class="d-page-sub">Define targeting, timing, and reward parameters</div>
+        <div class="d-grid">
+          <div class="s-card">
+            <div class="s-card-title">Event Parameters</div>
+            <div class="s-input-group"><div class="s-input-label">Event Type</div>
+              <div class="s-chips"><span class="s-chip active">Turn Down</span><span class="s-chip">Turn Up</span></div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <div class="s-input-group" style="flex:1;"><div class="s-input-label">Date</div><input class="s-input" type="date" value="2027-01-20"></div>
+              <div class="s-input-group" style="flex:1;"><div class="s-input-label">Start</div><input class="s-input" value="16:00"></div>
+              <div class="s-input-group" style="flex:1;"><div class="s-input-label">Duration</div><input class="s-input" value="2 hours"></div>
+            </div>
+            <div class="s-input-group"><div class="s-input-label">Opt-in Cutoff</div><input class="s-input" value="30 min before start"></div>
+          </div>
+          <div class="s-card">
+            <div class="s-card-title">Targeting</div>
+            <div class="s-input-group"><div class="s-input-label">Geographic Region</div>
+              <div class="s-chips"><span class="s-chip active">All VIC</span><span class="s-chip">Melbourne Metro</span><span class="s-chip">Ausgrid (NSW)</span><span class="s-chip">Energex (QLD)</span><span class="s-chip">All SA</span></div>
+            </div>
+            <div class="s-input-group"><div class="s-input-label">Exclusions</div><input class="s-input" placeholder="Postcodes to exclude (e.g., 3000, 3001)"></div>
+            <div class="s-input-group"><div class="s-input-label">Customer Filter</div>
+              <div class="s-chips"><span class="s-chip active">All Registered</span><span class="s-chip">Exclude Solar</span><span class="s-chip">Solar Only</span></div>
+            </div>
+          </div>
+        </div>
+        <button class="s-btn s-btn-blue" onclick="nextStep()">Run Prediction</button>
+      `},
+      { label: 'Prediction',
+        html: `
+        <div class="d-page-title">Pre-Issue Prediction</div>
+        <div class="d-page-sub">Based on 35% assumed opt-in rate (historical average). No customers notified yet.</div>
+        <div class="d-grid">
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">12,450</div><div class="s-stat-label">Eligible Customers</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;color:var(--blue);">4,358</div><div class="s-stat-label">Predicted Opt-ins</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;color:var(--green);">2,840 kWh</div><div class="s-stat-label">Predicted kWh Shift</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">$28,400</div><div class="s-stat-label">Estimated Reward Cost</div></div></div>
+        </div>
+        <div class="s-card" style="margin-top:0;">
+          <div class="s-card-title">Event Summary</div>
+          <div class="d-grid" style="margin:0;">
+            <div><div class="s-row"><span class="s-row-label">Type</span><span class="s-row-val">Turn Down</span></div>
+            <div class="s-row"><span class="s-row-label">Date</span><span class="s-row-val">20 Jan 2027</span></div>
+            <div class="s-row"><span class="s-row-label">Window</span><span class="s-row-val">16:00 — 18:00 (2h)</span></div></div>
+            <div><div class="s-row"><span class="s-row-label">Target</span><span class="s-row-val">All VIC, All Registered</span></div>
+            <div class="s-row"><span class="s-row-label">Rewards</span><span class="s-row-val">$10 / $5 / $2 (3 tiers)</span></div>
+            <div class="s-row"><span class="s-row-label">Cutoff</span><span class="s-row-val">15:30</span></div></div>
+          </div>
+        </div>
+        <div class="s-system-flow"><span class="s-sys-badge s-sys-kaluza">Kaluza API</span> returned prediction. Plan is saved but not issued.</div>
+        <div class="s-btn-row">
+          <button class="s-btn s-btn-green" onclick="nextStep()">Initiate Event</button>
+          <button class="s-btn s-btn-outline" onclick="goToStep(0)">Adjust Plan</button>
+          <button class="s-btn s-btn-outline">Discard</button>
+        </div>
+      `},
+      { label: 'Live Monitoring',
+        html: `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div><div class="d-page-title">Live Event Monitoring</div><div class="d-page-sub" style="margin-bottom:0;">Turn Down — 20 Jan, 16:00–18:00, All VIC</div></div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span class="s-tag s-tag-green pulse" style="font-size:12px;padding:6px 12px;">LIVE</span>
+            <span style="font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--text);">04:32</span>
+          </div>
+        </div>
+        <div class="d-grid">
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;color:var(--green);">2,847</div><div class="s-stat-label">Actual Opt-ins</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">22.9%</div><div class="s-stat-label">Opt-in Rate</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;color:var(--green);">1,850 kWh</div><div class="s-stat-label">Updated kWh Prediction</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">$18,500</div><div class="s-stat-label">Updated Cost Estimate</div></div></div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">Opt-in Progress vs Prediction</div>
+          <div class="s-progress"><div class="s-progress-label"><span>2,847 of 4,358 predicted</span><span style="font-weight:700;color:var(--green);">65%</span></div>
+          <div class="s-progress-bar"><div class="s-progress-fill green" style="width:65%;"></div></div></div>
+        </div>
+        <div class="s-system-flow">
+          <span class="s-sys-badge s-sys-kaluza">Kaluza</span> <span class="s-sys-arrow">&rarr;</span>
+          <span class="s-sys-badge s-sys-keg">KEG</span> <span class="s-sys-arrow">&rarr;</span>
+          <span class="s-sys-badge s-sys-sfmc">SFMC</span> invitations delivered (&lt;15 min SLA &check;)
+        </div>
+        <button class="s-btn s-btn-red" style="display:inline-block;width:auto;">Cancel Event</button>
+      `},
+    ]
+  },
+
+  // ═══════════════════════════════════════
+  // AGENT: CUSTOMER LOOKUP (Desktop)
+  // ═══════════════════════════════════════
+  agent: {
+    title: 'Agent Console',
+    icon: '🎧',
+    steps: [
+      { label: 'Search',
+        html: `
+        <div class="d-page-title">Customer Lookup</div>
+        <div class="d-page-sub">Search by NMI, name, or account ID to view BDR details</div>
+        <div class="s-search"><input placeholder="Search NMI, name, or account..." value="6305 1234 5678" style="font-size:15px;padding:14px 16px;"><button onclick="nextStep()" style="padding:14px 24px;">Search</button></div>
+        <div class="s-system-flow"><span class="s-sys-badge s-sys-sf">SF CRM</span> provides customer record <span class="s-sys-arrow">&rarr;</span> <span class="s-sys-badge s-sys-kaluza">Kaluza API</span> fetches BDR operational data</div>
+      `},
+      { label: 'Customer Overview',
+        html: `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div><div class="d-page-title">Jane Smith</div><div class="d-page-sub" style="margin-bottom:0;">NMI: 6305 1234 5678 | 42 Solar Crescent, Richmond VIC 3121</div></div>
+          <span class="s-tag s-tag-green" style="font-size:12px;padding:6px 14px;">Registered</span>
+        </div>
+        <div class="d-grid">
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;color:var(--green);">$127.50</div><div class="s-stat-label">Lifetime Rewards</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">12</div><div class="s-stat-label">Events Participated</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">92%</div><div class="s-stat-label">Participation Rate</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">847</div><div class="s-stat-label">kWh Shifted</div></div></div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">Registration Details</div>
+          <div class="d-grid" style="margin:0;">
+            <div><div class="s-row"><span class="s-row-label">Registered Since</span><span class="s-row-val">14 Jan 2027</span></div>
+            <div class="s-row"><span class="s-row-label">Notifications</span><span class="s-row-val">Push</span></div></div>
+            <div><div class="s-row"><span class="s-row-label">Opt-in Model</span><span class="s-row-val">Per event</span></div>
+            <div class="s-row"><span class="s-row-label">Current Streak</span><span class="s-row-val green">5 events</span></div></div>
+          </div>
+        </div>
+        <div class="s-btn-row">
+          <button class="s-btn s-btn-green" onclick="nextStep()">View BDR Event Log</button>
+          <button class="s-btn s-btn-outline" onclick="goToStep(3)">Agent Actions</button>
+        </div>
+      `},
+      { label: 'BDR Event Log',
+        html: `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div><div class="d-page-title">BDR Event Log</div><div class="d-page-sub" style="margin-bottom:0;">Jane Smith — NMI: 6305 1234 5678</div></div>
+          <button class="s-btn s-btn-outline" onclick="nextStep()" style="margin:0;">Agent Actions &rarr;</button>
+        </div>
+        <div class="s-card">
+          <div class="s-timeline">
+            <div class="s-tl-item"><div class="s-tl-line"><div class="s-tl-dot" style="border-color:var(--purple);"></div></div>
+              <div class="s-tl-content"><div class="s-tl-time">15 Jan 2027, 20:15</div><div class="s-tl-title">Bill Credit Applied — $10.00</div><div class="s-tl-detail">Ref: PER-2027-01-15-001 | Applied to account ending 5678</div></div></div>
+            <div class="s-tl-item"><div class="s-tl-line"><div class="s-tl-dot" style="border-color:var(--amber);"></div></div>
+              <div class="s-tl-content"><div class="s-tl-time">15 Jan 2027, 19:42</div><div class="s-tl-title">Reward Calculated — Tier 1 ($10.00)</div><div class="s-tl-detail">Baseline: 4.2 kWh | Actual: 2.1 kWh | Reduction: 50% | Target: 30% | Meter read: received</div></div></div>
+            <div class="s-tl-item"><div class="s-tl-line"><div class="s-tl-dot" style="border-color:var(--blue);"></div></div>
+              <div class="s-tl-content"><div class="s-tl-time">15 Jan 2027, 15:30</div><div class="s-tl-title">Opted In — Event 16:00–18:00</div><div class="s-tl-detail">Turn Down event, All VIC. Target: reduce by 30%. Tiers: $10/$5/$2</div></div></div>
+            <div class="s-tl-item"><div class="s-tl-line"><div class="s-tl-dot" style="border-color:var(--amber);"></div></div>
+              <div class="s-tl-content"><div class="s-tl-time">12 Jan 2027, 20:08</div><div class="s-tl-title">Reward Calculated — Tier 2 ($5.00)</div><div class="s-tl-detail">Baseline: 3.8 kWh | Actual: 2.4 kWh | Reduction: 38% | Meter read: received</div></div></div>
+            <div class="s-tl-item"><div class="s-tl-line"><div class="s-tl-dot" style="border-color:var(--blue);"></div></div>
+              <div class="s-tl-content"><div class="s-tl-time">12 Jan 2027, 16:15</div><div class="s-tl-title">Opted In — Event 17:00–19:00</div><div class="s-tl-detail">Turn Down event, Melbourne Metro</div></div></div>
+            <div class="s-tl-item"><div class="s-tl-line"><div class="s-tl-dot" style="border-color:var(--green);"></div></div>
+              <div class="s-tl-content"><div class="s-tl-time">14 Jan 2027, 09:12</div><div class="s-tl-title">Registered for PER</div><div class="s-tl-detail">Property: 42 Solar Crescent, Richmond VIC | NMI: 6305 1234 5678 | Notifications: Push</div></div></div>
+          </div>
+        </div>
+      `},
+      { label: 'Actions',
+        html: `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div><div class="d-page-title">Agent Actions</div><div class="d-page-sub" style="margin-bottom:0;">Jane Smith — NMI: 6305 1234 5678</div></div>
+          <button class="s-btn s-btn-outline" onclick="goToStep(2)" style="margin:0;">&larr; Back to Log</button>
+        </div>
+        <div class="s-card">
+          <div class="s-actions-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;">
+            <div class="s-action-btn" onclick="document.getElementById('ag-result2').style.display='block';document.getElementById('ag-result2').textContent='Registration confirmed. Event published to KEG → SF CRM + SFMC notified.';">
+              <div class="s-action-icon">+</div><span>Register</span></div>
+            <div class="s-action-btn" onclick="document.getElementById('ag-result2').style.display='block';document.getElementById('ag-result2').textContent='De-registration processed. Removed from all future events. KEG → SF CRM + SFMC notified.';">
+              <div class="s-action-icon">&minus;</div><span>De-register</span></div>
+            <div class="s-action-btn" onclick="document.getElementById('ag-result2').style.display='block';document.getElementById('ag-result2').textContent='Opted in to event: Turn Down — 20 Jan, 16:00–18:00. KEG event published. Prediction updated.';">
+              <div class="s-action-icon">&#10003;</div><span>Opt-in to Event</span></div>
+            <div class="s-action-btn" onclick="document.getElementById('ag-result2').style.display='block';document.getElementById('ag-result2').textContent='Property updated to: 15 Green St, Fitzroy VIC 3065 (NMI: 6305 9876 5432). KEG event published.';">
+              <div class="s-action-icon">&#8962;</div><span>Change Property</span></div>
+          </div>
+        </div>
+        <div class="s-card" id="ag-result2" style="display:none;background:var(--green-dim);color:var(--green);font-size:13px;font-weight:500;border-color:rgba(78,203,160,0.2);"></div>
+        <div class="s-system-flow">All agent actions use the same Kaluza APIs as customer self-service. Identical audit trail and KEG events. Logged to BDR event log with timestamp.</div>
+      `},
+    ]
+  },
+
+  // ═══════════════════════════════════════
+  // PROPOSITION MANAGER (Desktop)
+  // ═══════════════════════════════════════
+  propman: {
+    title: 'Proposition Config',
+    icon: '🎯',
+    steps: [
+      { label: 'Reward Profile',
+        html: `
+        <div class="d-page-title">Configure Reward Profile</div>
+        <div class="d-page-sub">Define the reward structure for the BDR proposition. This applies as the default for all new events.</div>
+        <div class="d-grid">
+          <div class="s-card">
+            <div class="s-card-title">Reward Type</div>
+            <div class="s-input-group"><div class="s-input-label">How are rewards calculated?</div>
+              <div class="s-chips">
+                <span class="s-chip active">Flat Amount</span>
+                <span class="s-chip">Per kWh Reduced</span>
+                <span class="s-chip">% of Savings</span>
+              </div>
+            </div>
+            <div class="s-card-sm">Flat Amount: customer receives a fixed dollar amount per tier achieved. Configurable per proposition.</div>
+          </div>
+          <div class="s-card">
+            <div class="s-card-title">Event Types Supported</div>
+            <div class="s-input-group"><div class="s-input-label">Which event directions are enabled?</div>
+              <div style="display:flex;gap:12px;margin-top:8px;">
+                <div style="flex:1;padding:14px;border-radius:10px;border:1.5px solid var(--green);background:var(--green-dim);text-align:center;cursor:default;">
+                  <div style="font-size:20px;margin-bottom:4px;">⬇️</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--green);">Turn Down</div>
+                  <div style="font-size:10px;color:var(--muted);margin-top:2px;">Reduce consumption</div>
+                </div>
+                <div style="flex:1;padding:14px;border-radius:10px;border:1.5px solid var(--border);background:#fafafa;text-align:center;cursor:default;opacity:0.5;">
+                  <div style="font-size:20px;margin-bottom:4px;">⬆️</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--muted);">Turn Up</div>
+                  <div style="font-size:10px;color:var(--muted);margin-top:2px;">Not enabled for R4</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">Tier Configuration</div>
+          <div class="d-page-sub" style="margin-bottom:12px;">Define achievement thresholds and reward values. Tiers are evaluated against the customer's reduction target.</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+              <th style="padding:8px 12px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">Tier</th>
+              <th style="padding:8px 12px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">Threshold</th>
+              <th style="padding:8px 12px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">Reward</th>
+              <th style="padding:8px 12px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">Example (1 kWh target)</th>
+              <th style="padding:8px 12px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:0.5px;">Status</th>
+            </tr></thead>
+            <tbody>
+              <tr style="border-bottom:1px solid #f2f2f2;"><td style="padding:10px 12px;"><span class="s-tag s-tag-green">Tier 1</span></td><td style="padding:10px 12px;"><input class="s-input" value="≥ 100% of target" style="width:160px;"></td><td style="padding:10px 12px;"><input class="s-input" value="$10.00" style="width:80px;"></td><td style="padding:10px 12px;color:var(--muted);">Reduce by ≥ 1.0 kWh</td><td style="padding:10px 12px;"><span class="s-tag s-tag-green">Active</span></td></tr>
+              <tr style="border-bottom:1px solid #f2f2f2;"><td style="padding:10px 12px;"><span class="s-tag s-tag-blue">Tier 2</span></td><td style="padding:10px 12px;"><input class="s-input" value="≥ 50% of target" style="width:160px;"></td><td style="padding:10px 12px;"><input class="s-input" value="$5.00" style="width:80px;"></td><td style="padding:10px 12px;color:var(--muted);">Reduce by ≥ 0.5 kWh</td><td style="padding:10px 12px;"><span class="s-tag s-tag-green">Active</span></td></tr>
+              <tr><td style="padding:10px 12px;"><span class="s-tag s-tag-amber">Tier 3</span></td><td style="padding:10px 12px;"><input class="s-input" value="≥ 25% of target" style="width:160px;"></td><td style="padding:10px 12px;"><input class="s-input" value="$2.00" style="width:80px;"></td><td style="padding:10px 12px;color:var(--muted);">Reduce by ≥ 0.25 kWh</td><td style="padding:10px 12px;"><span class="s-tag s-tag-green">Active</span></td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <button class="s-btn s-btn-outline" style="display:inline-block;width:auto;margin:0;font-size:12px;padding:8px 14px;">+ Add Tier</button>
+          </div>
+        </div>
+        <button class="s-btn s-btn-green" onclick="nextStep()">Save &amp; Configure Eligibility &rarr;</button>
+      `},
+      { label: 'Eligibility',
+        html: `
+        <div class="d-page-title">Eligibility Rules</div>
+        <div class="d-page-sub">Define which customers are eligible for BDR. Eligibility is mastered in SF CRM — these rules define what Kaluza checks when filtering participants.</div>
+        <div class="d-grid">
+          <div class="s-card">
+            <div class="s-card-title">Geographic Eligibility</div>
+            <div class="s-input-group"><div class="s-input-label">Eligible States</div>
+              <div class="s-chips">
+                <span class="s-chip active">VIC</span>
+                <span class="s-chip active">NSW</span>
+                <span class="s-chip active">QLD</span>
+                <span class="s-chip">SA</span>
+                <span class="s-chip">TAS</span>
+                <span class="s-chip">ACT</span>
+                <span class="s-chip">WA</span>
+                <span class="s-chip">NT</span>
+              </div>
+            </div>
+            <div class="s-input-group"><div class="s-input-label">Eligible Networks</div>
+              <div class="s-chips">
+                <span class="s-chip active">All in eligible states</span>
+                <span class="s-chip">Specific networks only</span>
+              </div>
+            </div>
+            <div class="s-input-group"><div class="s-input-label">Excluded Postcodes</div>
+              <input class="s-input" placeholder="Enter postcodes to permanently exclude (e.g., 2000, 3000)">
+            </div>
+          </div>
+          <div class="s-card">
+            <div class="s-card-title">Customer Eligibility</div>
+            <div class="s-input-group"><div class="s-input-label">Account Type</div>
+              <div class="s-chips">
+                <span class="s-chip active">Residential</span>
+                <span class="s-chip">Small Business</span>
+              </div>
+            </div>
+            <div class="s-input-group"><div class="s-input-label">Meter Type</div>
+              <div class="s-chips">
+                <span class="s-chip active">Smart Meter (interval data)</span>
+                <span class="s-chip">Basic Meter</span>
+              </div>
+            </div>
+            <div class="s-input-group"><div class="s-input-label">Solar Customers</div>
+              <div class="s-chips">
+                <span class="s-chip active">Included (solar-aware baseline)</span>
+                <span class="s-chip">Excluded</span>
+              </div>
+            </div>
+            <div class="s-input-group"><div class="s-input-label">Minimum Account Age</div>
+              <input class="s-input" value="90 days" style="width:120px;">
+            </div>
+          </div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">Registration Requirements</div>
+          <div class="d-grid" style="margin:0;">
+            <div>
+              <div class="s-input-group"><div class="s-input-label">Opt-in Model</div>
+                <div class="s-chips">
+                  <span class="s-chip active">Explicit per-event opt-in</span>
+                  <span class="s-chip" style="opacity:0.4;">Auto-opt-in (future)</span>
+                </div>
+              </div>
+              <div class="s-input-group"><div class="s-input-label">Property Selection</div>
+                <div class="s-chips">
+                  <span class="s-chip active">Single property at registration</span>
+                  <span class="s-chip" style="opacity:0.4;">Multi-property (future)</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="s-input-group"><div class="s-input-label">Notification Channels</div>
+                <div class="s-chips">
+                  <span class="s-chip active">Push</span>
+                  <span class="s-chip active">SMS</span>
+                  <span class="s-chip">Email</span>
+                </div>
+              </div>
+              <div class="s-input-group"><div class="s-input-label">De-registration Channels</div>
+                <div class="s-chips">
+                  <span class="s-chip active">App</span>
+                  <span class="s-chip active">Agent</span>
+                  <span class="s-chip" style="opacity:0.4;">SMS STOP (future)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="s-system-flow">
+          <span class="s-sys-badge s-sys-sf">SF CRM</span> masters customer eligibility data <span class="s-sys-arrow">&rarr;</span>
+          <span class="s-sys-badge s-sys-kaluza">Kaluza</span> applies these rules when filtering event participants
+        </div>
+        <button class="s-btn s-btn-green" onclick="nextStep()">Save &amp; Review Summary &rarr;</button>
+      `},
+      { label: 'Summary',
+        html: `
+        <div class="d-page-title">Proposition Summary</div>
+        <div class="d-page-sub">Review the current BDR proposition configuration before publishing</div>
+        <div class="d-grid">
+          <div class="s-card">
+            <div class="s-card-title">Reward Configuration</div>
+            <div class="s-row"><span class="s-row-label">Reward Type</span><span class="s-row-val">Flat Amount</span></div>
+            <div class="s-row"><span class="s-row-label">Tiers</span><span class="s-row-val">3 active</span></div>
+            <div class="s-row"><span class="s-row-label">Tier 1</span><span class="s-row-val green">&ge; 100% &rarr; $10</span></div>
+            <div class="s-row"><span class="s-row-label">Tier 2</span><span class="s-row-val">&ge; 50% &rarr; $5</span></div>
+            <div class="s-row"><span class="s-row-label">Tier 3</span><span class="s-row-val">&ge; 25% &rarr; $2</span></div>
+            <div class="s-row"><span class="s-row-label">Event Types</span><span class="s-row-val">Turn Down only</span></div>
+          </div>
+          <div class="s-card">
+            <div class="s-card-title">Eligibility Rules</div>
+            <div class="s-row"><span class="s-row-label">States</span><span class="s-row-val">VIC, NSW, QLD</span></div>
+            <div class="s-row"><span class="s-row-label">Networks</span><span class="s-row-val">All in eligible states</span></div>
+            <div class="s-row"><span class="s-row-label">Account Type</span><span class="s-row-val">Residential</span></div>
+            <div class="s-row"><span class="s-row-label">Meter</span><span class="s-row-val">Smart Meter only</span></div>
+            <div class="s-row"><span class="s-row-label">Solar</span><span class="s-row-val">Included</span></div>
+            <div class="s-row"><span class="s-row-label">Min Account Age</span><span class="s-row-val">90 days</span></div>
+          </div>
+          <div class="s-card">
+            <div class="s-card-title">Registration Settings</div>
+            <div class="s-row"><span class="s-row-label">Opt-in Model</span><span class="s-row-val">Explicit per-event</span></div>
+            <div class="s-row"><span class="s-row-label">Property</span><span class="s-row-val">Single at registration</span></div>
+            <div class="s-row"><span class="s-row-label">Notifications</span><span class="s-row-val">Push, SMS</span></div>
+            <div class="s-row"><span class="s-row-label">De-registration</span><span class="s-row-val">App, Agent</span></div>
+          </div>
+          <div class="s-card">
+            <div class="s-card-title">Estimated Reach</div>
+            <div style="text-align:center;padding:12px 0;">
+              <div class="s-stat-val" style="font-size:32px;">~285,000</div>
+              <div class="s-stat-label">Eligible Customers</div>
+            </div>
+            <div class="s-row"><span class="s-row-label">VIC</span><span class="s-row-val">142,000</span></div>
+            <div class="s-row"><span class="s-row-label">NSW</span><span class="s-row-val">98,000</span></div>
+            <div class="s-row"><span class="s-row-label">QLD</span><span class="s-row-val">45,000</span></div>
+          </div>
+        </div>
+        <div class="s-system-flow">
+          <span class="s-sys-badge s-sys-kaluza">Kaluza</span> stores proposition config <span class="s-sys-arrow">&rarr;</span>
+          Applied as defaults for all new events created by VPP Operators
+        </div>
+        <div class="s-btn-row">
+          <button class="s-btn s-btn-green">Publish Configuration</button>
+          <button class="s-btn s-btn-outline" onclick="goToStep(0)">Edit Rewards</button>
+          <button class="s-btn s-btn-outline" onclick="goToStep(1)">Edit Eligibility</button>
+        </div>
+      `},
+    ]
+  },
+
+  // ═══════════════════════════════════════
+  // SETTLEMENT & REWARD
+  // ═══════════════════════════════════════
+  settlement: {
+    title: 'Settlement',
+    icon: '💰',
+    steps: [
+      { label: 'Data Ingestion',
+        html: `
+        <div class="d-page-title">Settlement — Event 15 Jan 2027, 16:00–18:00</div>
+        <div class="d-page-sub">Phase 1: Meter data ingestion and validation</div>
+        <div class="d-grid">
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">3,842</div><div class="s-stat-label">Participants</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;color:var(--green);">3,798</div><div class="s-stat-label">Valid Meter Reads (98.9%)</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;color:var(--red);">44</div><div class="s-stat-label">Zero/Missing (Excluded)</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">24h</div><div class="s-stat-label">Data Latency</div></div></div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">Validation Summary</div>
+          <div class="d-grid" style="margin:0;">
+            <div><div class="s-row"><span class="s-row-label">Event</span><span class="s-row-val">Turn Down — All VIC</span></div>
+            <div class="s-row"><span class="s-row-label">Window</span><span class="s-row-val">16:00–18:00 (2h)</span></div></div>
+            <div><div class="s-row"><span class="s-row-label">Data received</span><span class="s-row-val green">16 Jan, 16:22</span></div>
+            <div class="s-row"><span class="s-row-label">Zero read handling</span><span class="s-row-val">44 excluded — no rewards</span></div></div>
+          </div>
+        </div>
+        <div class="s-system-flow"><span class="s-sys-badge" style="background:#f0f0f0;color:#475569;">Industry Meter Data</span> <span class="s-sys-arrow">&rarr;</span> <span class="s-sys-badge s-sys-kaluza">Kaluza</span> validates, deduplicates, ingests</div>
+        <button class="s-btn s-btn-blue" onclick="nextStep()">Calculate Baselines &rarr;</button>
+      `},
+      { label: 'Baseline Calc',
+        html: `
+        <div class="d-page-title">Baseline Comparison</div>
+        <div class="d-page-sub">Phase 2: 10-day rolling average for 16:00–18:00 window applied to 3,798 valid participants</div>
+        <div class="d-grid">
+          <div class="s-card">
+            <div class="s-card-title">Aggregate Results</div>
+            <div class="s-compare" style="margin:0;">
+              <div class="s-compare-item baseline"><div class="s-compare-val">15,191</div><div class="s-compare-unit">kWh</div><div class="s-compare-label">Total Baseline</div></div>
+              <div class="s-compare-item actual"><div class="s-compare-val">12,694</div><div class="s-compare-unit">kWh</div><div class="s-compare-label">Total Actual</div></div>
+            </div>
+            <div class="s-progress" style="margin-top:14px;">
+              <div class="s-progress-label"><span>Overall reduction</span><span style="font-weight:700;color:var(--green);">16.4%</span></div>
+              <div class="s-progress-bar"><div class="s-progress-fill green" style="width:100%;"></div></div>
+            </div>
+          </div>
+          <div class="s-card">
+            <div class="s-card-title">Tier Distribution</div>
+            <div class="s-row"><span><span class="s-tag s-tag-green">Tier 1</span> &ge; 100% of target</span><span class="s-row-val">1,204 customers</span></div>
+            <div class="s-row"><span><span class="s-tag s-tag-blue">Tier 2</span> &ge; 50% of target</span><span class="s-row-val">1,458 customers</span></div>
+            <div class="s-row"><span><span class="s-tag s-tag-amber">Tier 3</span> &ge; 25% of target</span><span class="s-row-val">712 customers</span></div>
+            <div class="s-row"><span style="color:var(--muted);">Below threshold</span><span class="s-row-val" style="color:var(--muted);">424 customers (no reward)</span></div>
+          </div>
+        </div>
+        <button class="s-btn s-btn-blue" onclick="nextStep()">Apply Rewards &rarr;</button>
+      `},
+      { label: 'Rewards',
+        html: `
+        <div class="d-page-title">Reward Calculation</div>
+        <div class="d-page-sub">Phase 3: Reward engine applied. Idempotent processing — no duplicate rewards possible.</div>
+        <div class="d-grid">
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;color:var(--green);">$24,970</div><div class="s-stat-label">Total Reward Value</div></div></div>
+          <div class="s-card"><div style="text-align:center;"><div class="s-stat-val" style="font-size:32px;">3,374</div><div class="s-stat-label">Customers Rewarded</div></div></div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">Reward Breakdown</div>
+          <div class="s-row"><span><span class="s-tag s-tag-green">Tier 1</span> 1,204 customers &times; $10</span><span class="s-row-val green">$12,040</span></div>
+          <div class="s-row"><span><span class="s-tag s-tag-blue">Tier 2</span> 1,458 customers &times; $5</span><span class="s-row-val">$7,290</span></div>
+          <div class="s-row"><span><span class="s-tag s-tag-amber">Tier 3</span> 712 customers &times; $2</span><span class="s-row-val">$1,424</span></div>
+          <div class="s-row"><span style="color:var(--muted);">Zero reads excluded</span><span class="s-row-val" style="color:var(--muted);">44 (no reward)</span></div>
+          <div class="s-row"><span style="color:var(--muted);">Below threshold</span><span class="s-row-val" style="color:var(--muted);">424 (no reward)</span></div>
+        </div>
+        <div class="s-system-flow">
+          <span class="s-sys-badge s-sys-kaluza">Kaluza</span> <span class="s-sys-arrow">&rarr;</span>
+          <span class="s-sys-badge s-sys-keg">KEG</span> settlement event published
+          <span style="color:var(--green);font-weight:600;margin-left:8px;">&lt;2h SLA &check;</span>
+        </div>
+        <button class="s-btn s-btn-blue" onclick="nextStep()">Deliver &amp; Credit &rarr;</button>
+      `},
+      { label: 'Complete',
+        html: `
+        <div class="d-page-title">Settlement Complete</div>
+        <div class="d-page-sub">Phase 4: All systems updated. Credits applied. Customers notified.</div>
+        <div class="d-grid">
+          <div class="s-card d-grid-wide">
+            <div class="s-card-title">System Status</div>
+            <div class="d-grid" style="margin:0;grid-template-columns:1fr 1fr 1fr 1fr;">
+              <div style="text-align:center;padding:12px;"><span class="s-sys-badge s-sys-kaluza" style="font-size:11px;padding:4px 10px;">Kaluza</span><div style="margin-top:8px;color:var(--green);font-weight:600;font-size:13px;">&check; Rewards calculated</div></div>
+              <div style="text-align:center;padding:12px;"><span class="s-sys-badge s-sys-keg" style="font-size:11px;padding:4px 10px;">KEG</span><div style="margin-top:8px;color:var(--green);font-weight:600;font-size:13px;">&check; Event published</div></div>
+              <div style="text-align:center;padding:12px;"><span class="s-sys-badge s-sys-sfmc" style="font-size:11px;padding:4px 10px;">SFMC</span><div style="margin-top:8px;color:var(--green);font-weight:600;font-size:13px;">&check; Notifications sent</div></div>
+              <div style="text-align:center;padding:12px;"><span class="s-sys-badge" style="background:rgba(245,160,72,0.1);color:var(--amber);font-size:11px;padding:4px 10px;">AGL Billing</span><div style="margin-top:8px;color:var(--green);font-weight:600;font-size:13px;">&check; $24,970 credited</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="s-card">
+          <div class="s-card-title">Audit Trail</div>
+          <div class="s-card-sm">Full calculation inputs exposed per customer per event via Reporting API and Data Mart:<br>baseline, actual consumption, target, tier achieved, reward amount, credit reference.</div>
+          <div style="margin-top:12px;">
+            <div class="s-row"><span class="s-row-label">Leakage check</span><span class="s-row-val green">0 invalid rewards (0%)</span></div>
+            <div class="s-row"><span class="s-row-label">Duplicate check</span><span class="s-row-val green">0 duplicates</span></div>
+            <div class="s-row"><span class="s-row-label">Zero read exclusions</span><span class="s-row-val">44 correctly excluded</span></div>
+          </div>
+        </div>
+      `},
+    ]
+  },
+};
+
+let currentFlow = 'register';
+let currentStep = 0;
+
+function startFlow(flowId) {
+  currentFlow = flowId;
+  currentStep = 0;
+  document.querySelectorAll('.flow-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderStep();
+}
+
+function nextStep() {
+  if (currentStep < flows[currentFlow].steps.length - 1) {
+    currentStep++;
+    renderStep();
+  }
+}
+
+function goToStep(step) {
+  currentStep = step;
+  renderStep();
+}
+
+function renderStep() {
+  const flow = flows[currentFlow];
+  const step = flow.steps[currentStep];
+  const isDesktop = desktopFlows.includes(currentFlow);
+
+  const phone = document.getElementById('frame-phone');
+  const desktop = document.getElementById('frame-desktop');
+
+  if (isDesktop) {
+    phone.classList.remove('active');
+    desktop.classList.add('active');
+
+    const config = desktopConfig[currentFlow];
+    document.getElementById('desktop-url').textContent = config.url;
+    document.getElementById('desktop-sidebar-title').textContent = config.title;
+
+    // Render sidebar
+    document.getElementById('desktop-sidebar-items').innerHTML = config.sidebar.map(item => {
+      if (item.section) return `<div class="desktop-sidebar-section">${item.section}</div>`;
+      return `<div class="desktop-sidebar-item ${item.active ? 'active' : ''}"><span class="desktop-sidebar-icon">${item.icon}</span>${item.label}</div>`;
+    }).join('');
+
+    // Render step bar + content
+    const stepBar = flow.steps.map((s, i) => {
+      const cls = i < currentStep ? 'done' : i === currentStep ? 'active' : '';
+      return `<div class="d-step ${cls}" onclick="goToStep(${i})"><span class="d-step-num">${i+1}</span>${s.label}</div>`;
+    }).join('');
+
+    document.getElementById('desktop-body').innerHTML = `<div class="d-step-bar">${stepBar}</div>${step.html}`;
+    document.getElementById('desktop-body').scrollTop = 0;
+  } else {
+    desktop.classList.remove('active');
+    phone.classList.add('active');
+
+    document.getElementById('nav-title').textContent = flow.title;
+    document.getElementById('nav-icon').textContent = flow.icon;
+    document.getElementById('phone-body').innerHTML = step.html;
+    document.getElementById('phone-body').scrollTop = 0;
+  }
+}
+
+// Init
+renderStep();
+</script>
+</body>
+</html>
